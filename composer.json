@@ -1,0 +1,19 @@
+{
+    "name": "crumbls/laravel-wordpress-headless",
+    "description": "A bridge to display Divi content in Laravel, using Tailwind.",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Chase C. Miller",
+            "email": "chase@crumbls.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "autoload": {
+        "psr-4": {
+            "Crumbls\\LaravelWordpress\\": "src/"
+        }
+    },
+    "require": {}
+}
