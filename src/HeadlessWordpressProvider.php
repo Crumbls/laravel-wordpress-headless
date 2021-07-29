@@ -34,6 +34,8 @@ class HeadlessWordpressProvider extends ServiceProvider
      */
     public function boot()
     {
+        $this->bootShortcodes();
+
         /**
          * Views for shortcodes
          */
@@ -41,12 +43,6 @@ class HeadlessWordpressProvider extends ServiceProvider
         $this->publishes([
             __DIR__.'/Views' => resource_path('views/vendor/wordpress'),
         ]);
-
-        /**
-         * Boot shortcodes.
-         */
-        $this->bootShortcodes();
-
 
         \Event::listen('component.start', function ($component) {
                 $component->prerender();

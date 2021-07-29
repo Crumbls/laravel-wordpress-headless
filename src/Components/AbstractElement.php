@@ -84,11 +84,6 @@ abstract class AbstractElement extends Component {
             $class = explode(' ', $class);
         }
 
-        // Module classname - Not always ncesessary.
-        if (method_exists($this, 'attributeTextOrientation')) {
-            $class[] = $this->attributeTextOrientation();
-        }
-
         $methods = array_values(preg_grep('#^generateClass#', get_class_methods($this)));
         $x = array_search(__FUNCTION__, $methods);
         if ($x !== false) {

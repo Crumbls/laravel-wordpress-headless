@@ -22,21 +22,33 @@ class Parser {
 
     public function process(string $content) : string {
         $shortcodes = $this->getShortcodes($content);
-
         $content = $this->stripInvalidParagaphTags($content, $shortcodes);
         $content = $this->convertShortcodesToComponents($content, $shortcodes);
-
-//        $content = $this->repairStructure($content, $shortcodes);
-
-//        dd($content);
-
-
+        $content = $this->render($content);
         return $content;
+    }
 
-        dd($res->content);
-        $res->content = $this->restructure($res->content);
+    private function render(string $content) : string {
+        $data = [];
 
-        return $res;
+        $data['__env'] = app(\Illuminate\View\Factory::class);
+
+        $php = \Blade::compileString($content);
+
+        $obLevel = ob_get_level();
+        ob_start();
+        extract($data, EXTR_SKIP);
+        try {
+            eval('?' . '>' . $php);
+        } catch (\Exception $e) {
+            while (ob_get_level() > $obLevel) ob_end_clean();
+            throw $e;
+        } catch (\Throwable $e) {
+            while (ob_get_level() > $obLevel) ob_end_clean();
+            throw new \FatalThrowableError($e);
+        }
+
+        return ob_get_clean();
     }
 
     /**

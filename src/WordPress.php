@@ -28,6 +28,4 @@ class WordPress {
     public static function parse(string $input) : string {
         return Parser::getInstance()->process($input);
     }
-
-
 }
