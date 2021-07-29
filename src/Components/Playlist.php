@@ -1,10 +1,10 @@
 <?php
 
-namespace Crumbls\LaravelDivi\Components;
+namespace Crumbls\LaravelWordpress\Components;
 
 use Illuminate\View\Component;
 
-class ColumnInner extends AbstractElement
+class Playlist extends AbstractElement
 {
     public $attributesExtended = [
     ];

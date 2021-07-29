@@ -2,7 +2,7 @@
 
 namespace Crumbls\LaravelWordpress\Helpers;
 
-use Crumbls\LaravelDivi\Helpers\Beautifier;
+use Crumbls\LaravelWordpress\Helpers\Beautifier;
 use \Illuminate\View\ComponentAttributeBag as BaseAttributeBag;
 
 class Parser {

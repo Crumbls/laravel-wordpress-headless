@@ -1,27 +1,15 @@
 <?php
 
-namespace Crumbls\LaravelDivi\Components;
+namespace Crumbls\LaravelWordpress\Components;
 
-use Crumbls\LaravelDivi\Css\Generator;
-use Crumbls\LaravelDivi\Helpers\ComponentAttributeBag;
-use Crumbls\LaravelDivi\Traits\HasHiddenRules;
-use Crumbls\LaravelDivi\Traits\HasMarginRules;
-use Crumbls\LaravelDivi\Traits\HasModuleAlignment;
-use Crumbls\LaravelDivi\Traits\HasPaddingRules;
-use Crumbls\LaravelDivi\Traits\HasWidthRules;
-use Illuminate\View\Component;
-
+use Crumbls\LaravelWordpress\Css\Generator;
+use Crumbls\LaravelWordpress\Helpers\ComponentAttributeBag;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Contracts\View\View as ViewContract;
 use Illuminate\Support\Str;
+use Illuminate\View\Component;
 
 abstract class AbstractElement extends Component {
-    use HasHiddenRules;
-    use HasMarginRules;
-    use HasModuleAlignment;
-    use HasPaddingRules;
-    use HasWidthRules;
-
     private $generator = null;
     private static $ids = [];
     public static $path = '';
@@ -32,37 +20,7 @@ abstract class AbstractElement extends Component {
 
     public function __construct() {
         $extended = property_exists($this, 'attributesExtended') ? $this->attributesExtended : [];
-        $this->withAttributes(array_merge(
-            [
-                'fb_built' => null,
-                '_builder_version' => null,
-                '_parent_type' => null,
-                '_parent_path' => null,
-                'module_id' => null,
-                'module_class' => null,
-                'hover_enabled' => null,
-                'custom_css_before' => null,
-                'custom_css_main_element' => null,
-                'custom_css_after' => null,
-                'disabled_on' => null,
-                'overflow-y' => null,
-                'overflow-x' => null,
-                'hover_transition_duration' => null,
-                'hover_transition_speed_curve' => null,
-                'sticky_position' => null,
-                'sticky_offset_top' => null,
-                'sticky_limit_bottom' => null,
-                'scroll_vertical_motion_enable' => null,
-                'motion_trigger_start' => null,
-                'sticky_enabled' => null,
-
-                'custom_margin' => null,
-                'custom_padding' => null,
-            ],
-            $extended
-        ));
-//        $this->withAttributes($extended);
-
+        $this->withAttributes($extended);
     }
 
     /**
@@ -74,6 +32,10 @@ abstract class AbstractElement extends Component {
         return new ComponentAttributeBag($attributes);
     }
 
+    /**
+     * Get our unique identifier.
+     * @return string
+     */
     protected static function getUniqueId() : string {
         $id = preg_replace('#[^a-z]#', '', \Str::uuid());
         while (in_array($id, static::$ids)) {
@@ -84,6 +46,10 @@ abstract class AbstractElement extends Component {
 
     }
 
+    /**
+     * Generate a unique ID, if not defined.
+     * @return mixed
+     */
     protected function generateUniqueId() {
         $id = null;
         if (!$this->attributes->has('module_id') || !$this->attributes->get('module_id')) {
@@ -94,6 +60,9 @@ abstract class AbstractElement extends Component {
         }
     }
 
+    /**
+     * Generate our path.
+     */
     protected function generatePath() {
         $id = $this->generateUniqueId();
         if (!static::$path) {
@@ -105,6 +74,9 @@ abstract class AbstractElement extends Component {
 
     }
 
+    /**
+     * Class builder
+     */
     protected function generateClass() {
         // Class builder.
         $class = $this->attributes->has('module_class') ? $this->attributes->get('module_class') : [];
@@ -140,6 +112,10 @@ abstract class AbstractElement extends Component {
  //       $this->attributes = $this->attributes->merge(['module_class' => $class]);
     }
 
+    /**
+     * Style generator
+     * @return Generator
+     */
     protected function getStyleGenerator() {
         if (!$this->generator) {
             $this->generator = new Generator();
@@ -234,12 +210,18 @@ abstract class AbstractElement extends Component {
      */
     public function render()
     {
-        $view = 'divi::'.strtolower(Str::kebab(class_basename(get_class($this))));
-//        echo get_class($this).'<br />';
+        $view = 'wordpress::'.strtolower(Str::kebab(class_basename(get_class($this))));
+
         return view($view, array_merge($this->attributes->getAttributes(), ['component' => $this]));
     }
 
+    /**
+     * @param $args
+     * @param array $defaults
+     * @return array
+     */
     protected function parseArgments($args, $defaults = array()) : array {
+        echo __METHOD__;exit;
         if ( is_object( $args ) ) {
             $parsed_args = get_object_vars( $args );
         } elseif ( is_array( $args ) ) {
@@ -254,45 +236,4 @@ abstract class AbstractElement extends Component {
 
         return $parsed_args;
     }
-
-    protected function attributeBorder() {
-
-    }
-    protected function attributeBoxShadow() {
-
-    }
-    protected function attributeDivider() {
-
-    }
-    protected function attributeHeight() {
-
-    }
-    protected function attributeMargin() {
-
-    }
-    protected function attributePadding() {
-
-    }
-    protected function attributeMaxWidth() {
-
-    }
-    protected function attributeOverflow() {
-
-    }
-    protected function attributePosition() {
-
-    }
-    protected function attributeScroll() {
-
-    }
-    protected function attributeSticky() {
-
-    }
-    protected function attributeTextShadow() {
-
-    }
-    protected function attributeTransform() {
-
-    }
-
 }
