@@ -9,6 +9,7 @@ use Crumbls\LaravelWordpress\Components\Embed;
 use Crumbls\LaravelWordpress\Components\Gallery;
 use Crumbls\LaravelWordpress\Components\Playlist;
 use Crumbls\LaravelWordpress\Components\Video;
+use Crumbls\LaravelWordpress\Console\ComponentMakeCommand;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
 
@@ -34,6 +35,8 @@ class HeadlessWordpressProvider extends ServiceProvider
      */
     public function boot()
     {
+
+        $this->bootCommands();
         $this->bootShortcodes();
 
         /**
@@ -50,6 +53,18 @@ class HeadlessWordpressProvider extends ServiceProvider
         \Event::listen('component.end', function ($component) {
             $component->postrender();
         });
+    }
+
+    /**
+     * Bring our commands online.
+     */
+    protected function bootCommands() : void {
+        if (!$this->app->runningInConsole()) {
+            return;
+        }
+        $this->commands([
+           ComponentMakeCommand::class
+        ]);
     }
 
     /**

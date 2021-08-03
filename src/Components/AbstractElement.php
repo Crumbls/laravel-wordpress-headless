@@ -2,6 +2,7 @@
 
 namespace Crumbls\LaravelWordpress\Components;
 
+use Crumbls\LaravelDivi\Components\Image;
 use Crumbls\LaravelWordpress\Css\Generator;
 use Crumbls\LaravelWordpress\Helpers\ComponentAttributeBag;
 use Illuminate\Contracts\Support\Htmlable;
@@ -141,7 +142,6 @@ abstract class AbstractElement extends Component {
 
 
     public function prerender() {
-
         $this->generateUniqueId();
         $this->generatePath();
         $this->generateClass();

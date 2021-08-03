@@ -45,7 +45,8 @@ class Parser {
             throw $e;
         } catch (\Throwable $e) {
             while (ob_get_level() > $obLevel) ob_end_clean();
-            throw new \FatalThrowableError($e);
+            throw $e;
+//            throw new \Throwable($e);
         }
 
         return ob_get_clean();
@@ -199,20 +200,44 @@ class Parser {
             return $content;
         }
 
+        /**
+         * Make sure html is valid.
+         */
+        preg_match_all('#<(.*?)[\s|>]#', $content, $tags);
+        $tags = array_unique(array_merge($tags[1], $shortcodes));
+        $tags = array_filter($tags, function($e) { return $e[0] != '/'; });
+
+        $content = $this->restructure($content, $tags);
+
+        return $content;
+
+
+//echo __FILE__;exit;
+//echo $content;
+  //      exit;
+//        dd($content);
+
         $dom = new \DOMDocument();
         libxml_use_internal_errors(true);
         $dom->preserveWhiteSpace = false;
         $dom->formatOutput = true;
-        $dom->loadHTML($content);
-        libxml_clear_errors();
-        $body = $dom->documentElement->firstChild->firstChild;
+//        $dom->loadHTML($content);
+        $dom->loadXML($content);
+echo $dom->saveXML();exit;
+        if (true) {
+            return $dom->saveXML();
+        }
+
+//        libxml_clear_errors();
+        //$body = $dom->documentElement->firstChild->firstChild;
+        $body = null;
 
         $beautify = new Beautifier([
             'indent_inner_html' => true,
             'indent_char' => "\t"
         ]);
 
-        return $beautify->beautify($dom->saveHTML($body));
+        return $beautify->beautify($dom->saveXML($body));
     }
 
     /**
@@ -232,6 +257,17 @@ class Parser {
          * Get all shortcodes.
          */
         $shortcodes = array_values(array_unique($shortcodes[1]));
+
+        /**
+         * Intersect with registered components.
+         * You could just override.  Sadly, we are running short on time, as per usual.
+         */
+        if (true) {
+                $intersect = array_map(function($e) {
+                    return strtolower(str_replace('-', '_', $e));
+                }, array_keys(\Blade::getClassComponentAliases()));
+                $shortcodes = array_intersect($intersect, $shortcodes);
+        }
 
         return $shortcodes;
     }
@@ -360,6 +396,226 @@ class Parser {
             return $attrarr;
         }
         return [];
+    }
+
+
+    /**
+     * extract_tags()
+     * Extract specific HTML tags and their attributes from a string.
+     *
+     * You can either specify one tag, an array of tag names, or a regular expression that matches the tag name(s).
+     * If multiple tags are specified you must also set the $selfclosing parameter and it must be the same for
+     * all specified tags (so you can't extract both normal and self-closing tags in one go).
+     *
+     * The function returns a numerically indexed array of extracted tags. Each entry is an associative array
+     * with these keys :
+     *  tag_name    - the name of the extracted tag, e.g. "a" or "img".
+     *  offset      - the numberic offset of the first character of the tag within the HTML source.
+     *  contents    - the inner HTML of the tag. This is always empty for self-closing tags.
+     *  attributes  - a name -> value array of the tag's attributes, or an empty array if the tag has none.
+     *  full_tag    - the entire matched tag, e.g. '<a href="http://example.com">example.com</a>'. This key
+     *                will only be present if you set $return_the_entire_tag to true.
+     *
+     * @param string $html The HTML code to search for tags.
+     * @param string|array $tag The tag(s) to extract.
+     * @param bool $selfclosing Whether the tag is self-closing or not. Setting it to null will force the script to try and make an educated guess.
+     * @param bool $return_the_entire_tag Return the entire matched tag in 'full_tag' key of the results array.
+     * @param string $charset The character set of the HTML code. Defaults to ISO-8859-1.
+     *
+     * @return array An array of extracted tags, or an empty array if no matching tags were found.
+     */
+    function extract_tags( $html, $tag, $selfclosing = null, $return_the_entire_tag = false, $charset = 'ISO-8859-1' ){
+
+        if ( is_array($tag) ){
+            $tag = implode('|', $tag);
+        }
+
+        //If the user didn't specify if $tag is a self-closing tag we try to auto-detect it
+        //by checking against a list of known self-closing tags.
+        $selfclosing_tags = array( 'area', 'base', 'basefont', 'br', 'hr', 'input', 'img', 'link', 'meta', 'col', 'param' );
+        if ( is_null($selfclosing) ){
+            $selfclosing = in_array( $tag, $selfclosing_tags );
+        }
+
+        //The regexp is different for normal and self-closing tags because I can't figure out
+        //how to make a sufficiently robust unified one.
+        if ( $selfclosing ){
+            $tag_pattern =
+                '@<(?P<tag>'.$tag.')           # <tag
+            (?P<attributes>\s[^>]+)?       # attributes, if any
+            \s*/?>                   # /> or just >, being lenient here 
+            @xsi';
+        } else {
+            $tag_pattern =
+                '@<(?P<tag>'.$tag.')           # <tag
+            (?P<attributes>\s[^>]+)?       # attributes, if any
+            \s*>                 # >
+            (?P<contents>.*?)         # tag contents
+            </(?P=tag)>               # the closing </tag>
+            @xsi';
+        }
+
+        $attribute_pattern =
+            '@
+        (?P<name>\w+)                         # attribute name
+        \s*=\s*
+        (
+            (?P<quote>[\"\'])(?P<value_quoted>.*?)(?P=quote)    # a quoted value
+            |                           # or
+            (?P<value_unquoted>[^\s"\']+?)(?:\s+|$)           # an unquoted value (terminated by whitespace or EOF) 
+        )
+        @xsi';
+
+        //Find all tags
+        if ( !preg_match_all($tag_pattern, $html, $matches, PREG_SET_ORDER | PREG_OFFSET_CAPTURE ) ){
+            //Return an empty array if we didn't find anything
+            return array();
+        }
+
+        $tags = array();
+        foreach ($matches as $match){
+
+            //Parse tag attributes, if any
+            $attributes = array();
+            if ( !empty($match['attributes'][0]) ){
+
+                if ( preg_match_all( $attribute_pattern, $match['attributes'][0], $attribute_data, PREG_SET_ORDER ) ){
+                    //Turn the attribute data into a name->value array
+                    foreach($attribute_data as $attr){
+                        if( !empty($attr['value_quoted']) ){
+                            $value = $attr['value_quoted'];
+                        } else if( !empty($attr['value_unquoted']) ){
+                            $value = $attr['value_unquoted'];
+                        } else {
+                            $value = '';
+                        }
+
+                        //Passing the value through html_entity_decode is handy when you want
+                        //to extract link URLs or something like that. You might want to remove
+                        //or modify this call if it doesn't fit your situation.
+                        $value = html_entity_decode( $value, ENT_QUOTES, $charset );
+
+                        $attributes[$attr['name']] = $value;
+                    }
+                }
+
+            }
+
+            $tag = array(
+                'tag_name' => $match['tag'][0],
+                'offset' => $match[0][1],
+                'contents' => !empty($match['contents'])?$match['contents'][0]:'', //empty for self-closing tags
+                'attributes' => $attributes,
+            );
+            if ( $return_the_entire_tag ){
+                $tag['full_tag'] = $match[0][0];
+            }
+
+            $tags[] = $tag;
+        }
+
+        return $tags;
+    }
+
+    protected function restructure(string $content, array $tags = []) : string {
+        /**
+         * Convert the input to an array.
+         * @param $input
+         * @return array
+         */
+        $recursive = function(&$input) use (&$recursive, $tags) : array {
+            if (is_string($input)) {
+                $input = $this->extract_tags($input, $tags);
+            }
+
+            if (!is_array($input)) {
+                echo 'error123';
+                exit;
+            }
+
+            $keys = array_keys($input);
+            $isSequential = count($keys) == count(array_filter($keys, 'is_numeric'));
+
+            if ($isSequential) {
+                foreach($input as $idx => $row) {
+                    $input[$idx]['children'] = $recursive($row['contents'], $tags);
+
+                    /**
+                     * This is an  ugly fix for DIVI where it sends columns inside of sections sometimes.
+                     * They should be wrapped by rows, IMHO.  Yeah, we shouldn't do this, but we need something
+                     * short term and fast.
+                     */
+                    if (true && $row['tag_name'] == 'x-et-pb-section' && $input[$idx]['children']) {
+                        $tagNames = array_column($input[$idx]['children'], 'tag_name');
+                        $x = count($tagNames);
+                        $y = count(array_filter($tagNames, function($e) {
+                            return $e == 'x-et-pb-column';
+                        }));
+                        if ($y && $y == $x) {
+                            $input[$idx]['children'] = [
+                                [
+                                'tag_name' => 'x-et-pb-row',
+                                'offset' => null,
+                                'attributes' => [
+                                    'autogenerated' => true
+                                ],
+                                'children' => $input[$idx]['children']
+                                ]
+                            ];
+                        }
+                    }
+
+                    if ($input[$idx]['children']) {
+                        unset($input[$idx]['contents']);
+                    }
+                }
+            } else {
+                echo __LINE__;
+                print_r($input);
+            }
+
+            return $input;
+        };
+
+        $content = $recursive($content, $tags);
+
+        /**
+         * Poor programming practice in effort to save time for now.  Sorry!
+         * @param $input
+         * @return string
+         */
+        $recursive = function(&$input, int $indent = 0) use (&$recursive) : string {
+            $return = [];
+            foreach($input as $idx => $row) {
+                if (!array_key_exists('children', $row)) {
+                    echo 'hjmmm';
+                    continue;
+                }
+
+                $attributes = str_replace("=", '="', http_build_query($row['attributes'], null, '" ', PHP_QUERY_RFC3986)).'"';
+
+                if (!$row['children'] && !$row['contents']) {
+                    $return[] = str_repeat("\t", $indent).sprintf('<%s %s />', $row['tag_name'], $attributes);
+                    continue;
+                }
+
+                $return[] = str_repeat("\t", $indent).sprintf('<%s %s>', $row['tag_name'], $attributes);
+                if (array_key_exists('contents', $row) && $row['contents']) {
+//                    $return[] = 'inner guts';
+                    $return[] = $row['contents'];
+//                  print_r($row['contents']);
+                } else if ($row['children']) {
+                    $return[] = $recursive($row['children'], ($indent + 1));
+                }
+                $return[] = str_repeat("\t", $indent).sprintf('</%s>', $row['tag_name']);
+            }
+            $return = implode("\r\n", $return);
+            return $return;
+        };
+
+        $content = $recursive($content);
+
+        return $content;
     }
 }
 
